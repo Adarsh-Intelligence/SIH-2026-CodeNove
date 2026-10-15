@@ -13,7 +13,7 @@ BACKEND_DIR = Path(__file__).parent.resolve()
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import numpy as np
@@ -77,13 +77,18 @@ async def health():
     Returns backend health status, model readiness, and device information.
     Safe to call before model loads.
     """
-    import torch
+    try:
+        import torch
+        cuda_avail = torch.cuda.is_available()
+    except Exception:
+        cuda_avail = False
+
     initialized = getattr(inference_service, "_initialized", False)
     return {
         "status": "ok" if initialized else "initializing",
         "model_ready": initialized,
         "device": str(getattr(inference_service, "device", "unknown")),
-        "cuda_available": torch.cuda.is_available(),
+        "cuda_available": cuda_avail,
         "checkpoint_loaded": getattr(inference_service, "checkpoint_loaded", False),
         "service": "GeoSR-AI Super Resolution API",
         "version": "1.0.0",
@@ -297,9 +302,13 @@ def _validate_session_id(session_id: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid session ID.")
 
 
-# ── Root / Health Route ────────────────────────────────────────────────────────
+# ── Root / Frontend Route ──────────────────────────────────────────────────────
 @app.get("/", tags=["System"])
-async def root():
+async def root(request: Request):
+    root_index = PROJECT_ROOT / "index.html"
+    accept = request.headers.get("accept", "")
+    if root_index.exists() and ("text/html" in accept or "*/*" in accept or not accept):
+        return FileResponse(str(root_index), media_type="text/html")
     return {
         "service": "GeoSR-AI API Backend",
         "status": "online",
@@ -307,6 +316,15 @@ async def root():
         "health": "/api/health",
         "model_info": "/api/model-info",
     }
+
+
+@app.get("/app", tags=["System"])
+@app.get("/index.html", tags=["System"])
+async def serve_index():
+    root_index = PROJECT_ROOT / "index.html"
+    if root_index.exists():
+        return FileResponse(str(root_index), media_type="text/html")
+    raise HTTPException(status_code=404, detail="index.html not found")
 
 
 frontend_out_dir = PROJECT_ROOT / "frontend" / "out"
