@@ -299,8 +299,8 @@ const io=new IntersectionObserver((es,o)=>es.forEach(e=>{if(!e.isIntersecting)re
 $$('.stat').forEach(el=>io.observe(el));
 
 /* ---------- API + demo ---------- */
-let API=(()=>{try{return localStorage.getItem('geosr_api')}catch(e){return null}})()||window.GEOSR_API||'http://localhost:8000';
-const apiI=$('#api');apiI.value=API;
+let API=(()=>{try{return localStorage.getItem('geosr_api')}catch(e){return null}})()||window.GEOSR_API||(window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:8000':'');
+const apiI=$('#api');apiI.value=API||(window.location.origin==='null'?'http://localhost:8000':window.location.origin);
 let online=false,file=null,sample=false,busy=false;
 function setStat(k,t){$('#dot').className='dot '+k;$('#stx').textContent=t}
 async function ping(){try{const c=new AbortController(),to=setTimeout(()=>c.abort(),4000);const r=await fetch(API+'/api/health',{signal:c.signal});clearTimeout(to);const j=await r.json();online=true;
